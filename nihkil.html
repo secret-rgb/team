@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TeamSphere — Collab Web</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --card: #111732;
+      --muted: #8da0c9;
+      --text: #e9eefc;
+      --accent: #6aa0ff;
+      --accent-2: #9dd47a;
+      --danger: #ff6b6b;
+      --warn: #ffb020;
+      --border: #25315a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color: var(--text); background: radial-gradient(1200px 600px at 20% -10%, #1b2450, transparent), var(--bg);
+    }
+    header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding: 14px 18px; border-bottom: 1px solid var(--border);
+      position: sticky; top:0; background: rgba(11,16,32,.75); backdrop-filter: blur(8px);
+    }
+    header .brand { font-weight: 700; letter-spacing: 0.3px; }
+    header .status { font-size: 12px; color: var(--muted); }
+    main { padding: 18px; display: grid; gap: 18px; grid-template-columns: 260px 1fr 320px; }
+    @media (max-width: 1080px) { main { grid-template-columns: 1fr; } }
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,.03), transparent), var(--card);
+      border: 1px solid var(--border); border-radius: 12px; padding: 14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    }
+    h3, h4 { margin: 8px 0 10px; }
+    .row { display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
+    input, select, button, textarea {
+      border-radius: 10px; border: 1px solid var(--border); padding: 10px 12px; color: var(--text);
+      background: #0f1733; outline: none; font: inherit;
+    }
+    input::placeholder, textarea::placeholder { color: #7d8bb9; }
+    button { background: linear-gradient(180deg, #2b4ae6, #1634c9); border: none; cursor: pointer; }
+    button.secondary { background: #243059; }
+    button.ghost { background: transparent; border: 1px dashed var(--border); }
+    button.success { background: linear-gradient(180deg, #58c86b, #2f9b46); }
+    button.warn { background: linear-gradient(180deg, #ffb020, #e08900); }
+    button.danger { background: linear-gradient(180deg, #ff6b6b, #de3e3e); }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    .list { display: grid; gap: 8px; padding: 0; margin: 0; list-style: none; }
+    .item { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px; border:1px solid var(--border); border-radius:10px; background:#0f1733; }
+    .pill { padding: 4px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--border); background: #0a1230; color: var(--muted); }
+    .muted { color: var(--muted); font-size: 12px; }
+    .success { color: #9dd47a; }
+    .danger-txt { color: var(--danger); }
+    .divider { height:1px; background: var(--border); margin: 10px 0; }
+    .chat-box { display:grid; gap:8px; grid-template-rows: 1fr auto; height: 420px; }
+    .scroll { overflow:auto; border:1px solid var(--border); border-radius:10px; padding:8px; background:#0f1733; }
+    .msg { display:grid; gap:4px; padding:8px; border:1px solid var(--border); border-radius:10px; background:#0b1533; }
+    .msg.me { background: #0b2e5a; border-color: #2b4ae6; }
+    .toolbar { display:flex; gap:8px; align-items:center; }
+    .hidden { display: none !important; }
+    .badge { font-size: 11px; padding: 2px 6px; border-radius: 8px; background: #1d2b5a; border: 1px solid #2f3d74; color: #a8b5e6; }
+    .toast {
+      position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+      background: #12214a; border: 1px solid var(--border); padding: 10px 14px; border-radius: 10px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.35); z-index: 1000;
+    }
+    .label { font-size: 12px; color: var(--muted); margin-bottom: 4px; display:block; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; color: #a9b6e3; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <span class="brand">TeamSphere</span>
+      <span class="badge" id="room-badge">room: none</span>
+      <span class="badge" id="role-badge">role: guest</span>
+    </div>
+    <div class="status" id="status">Idle</div>
+  </header>
+
+  <main>
+    <!-- Left: Rooms & People -->
+    <section class="card" id="left-panel">
+      <h3>Workspace</h3>
+      <div>
+        <label class="label">Room</label>
+        <div class="row">
+          <input id="room-input" placeholder="e.g., general" />
+          <button id="join-btn">Join</button>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <input id="name-input" placeholder="Your name" />
+          <input id="pin-input" placeholder="Admin PIN (optional)" class="mono" />
+        </div>
+        <p class="muted">Tip: Open this page in two tabs, join the same room to test.</p>
+      </div>
+
+      <div class="divider"></div>
+      <h4>Participants</h4>
+      <ul class="list" id="people-list"></ul>
+    </section>
+
+    <!-- Center: Chat -->
+    <section class="card" id="center-panel">
+      <h3>Chat</h3>
+      <div class="chat-box">
+        <div id="chat-list" class="scroll" aria-live="polite"></div>
+        <div class="toolbar">
+          <input id="chat-input" placeholder="Type a message..." />
+          <button id="send-btn">Send</button>
+        </div>
+        <div class="muted" id="chat-muted-note" style="display:none">You’ve been muted by an admin.</div>
+      </div>
+    </section>
+
+    <!-- Right: Admin Console -->
+    <aside class="card" id="admin-panel">
+      <h3>Admin console</h3>
+      <div class="muted" id="admin-locked-note">Enter the admin PIN when joining to unlock.</div>
+
+      <div id="admin-controls" class="hidden">
+        <div class="grid-2">
+          <button id="announce-btn" class="warn">Broadcast announcement</button>
+          <button id="muteall-btn" class="secondary">Toggle mute all</button>
+        </div>
+
+        <div class="grid-2" style="margin-top:8px">
+          <button id="lockroom-btn" class="secondary">Toggle lock room</button>
+          <button id="endmeeting-btn" class="danger">End meeting</button>
+        </div>
+
+        <div class="divider"></div>
+        <label class="label">Kick a participant</label>
+        <div class="row">
+          <select id="kick-select"></select>
+          <button id="kick-btn" class="danger">Kick</button>
+        </div>
+
+        <div class="divider"></div>
+        <div class="grid-3">
+          <div><span class="label">Room locked</span><div id="room-locked-state" class="pill">false</div></div>
+          <div><span class="label">Muted all</span><div id="muted-all-state" class="pill">false</div></div>
+          <div><span class="label">Users</span><div id="user-count" class="pill">0</div></div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script>
+    // ======== Config ========
+    const ADMIN_PIN = "452019"; // Change this PIN
+    const APP_CHANNEL = "teamsphere-demo";
+    const STORAGE_KEY = "ts-bc";
+    const clientId = crypto.randomUUID();
+
+    // ======== State ========
+    const state = {
+      joined: false,
+      name: "",
+      room: "",
+      isAdmin: false,
+      mutedAll: false,
+      roomLocked: false,
+      mutedByAdmin: false,
+      participants: new Map(), // id -> { name, isAdmin, room }
+    };
+
+    // ======== UI elements ========
+    const el = {
+      status: document.getElementById("status"),
+      roomBadge: document.getElementById("room-badge"),
+      roleBadge: document.getElementById("role-badge"),
+
+      roomInput: document.getElementById("room-input"),
+      nameInput: document.getElementById("name-input"),
+      pinInput: document.getElementById("pin-input"),
+      joinBtn: document.getElementById("join-btn"),
+
+      peopleList: document.getElementById("people-list"),
+      chatList: document.getElementById("chat-list"),
+      chatInput: document.getElementById("chat-input"),
+      sendBtn: document.getElementById("send-btn"),
+      chatMutedNote: document.getElementById("chat-muted-note"),
+
+      adminPanel: document.getElementById("admin-panel"),
+      adminControls: document.getElementById("admin-controls"),
+      adminLockedNote: document.getElementById("admin-locked-note"),
+
+      announceBtn: document.getElementById("announce-btn"),
+      muteAllBtn: document.getElementById("muteall-btn"),
+      lockRoomBtn: document.getElementById("lockroom-btn"),
+      endMeetingBtn: document.getElementById("endmeeting-btn"),
+      kickSelect: document.getElementById("kick-select"),
+      kickBtn: document.getElementById("kick-btn"),
+      roomLockedState: document.getElementById("room-locked-state"),
+      mutedAllState: document.getElementById("muted-all-state"),
+      userCount: document.getElementById("user-count"),
+
+      toast: document.getElementById("toast"),
+    };
+
+    // ======== Messaging bus (BroadcastChannel + storage fallback) ========
+    const channel = "BroadcastChannel" in window ? new BroadcastChannel(APP_CHANNEL) : null;
+
+    function post(event, payload) {
+      const msg = { id: crypto.randomUUID(), from: clientId, event, payload, at: Date.now() };
+      if (channel) {
+        channel.postMessage(msg);
+      } else {
+        // storage event fires in OTHER tabs only
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(msg));
+        // cleanup to keep storage tidy
+        setTimeout(() => localStorage.removeItem(STORAGE_KEY), 0);
+      }
+    }
+
+    function onMessage(handler) {
+      if (channel) {
+        channel.onmessage = (e) => handler(e.data);
+      } else {
+        window.addEventListener("storage", (e) => {
+          if (e.key === STORAGE_KEY && e.newValue) {
+            try { handler(JSON.parse(e.newValue)); } catch {}
+          }
+        });
+      }
+    }
+
+    onMessage((msg) => {
+      // Ignore messages from other rooms
+      const p = msg.payload || {};
+      if (p.room && state.room && p.room !== state.room) return;
+      if (msg.from === clientId) return;
+      handleEvent(msg.event, p, msg.from);
+    });
+
+    // ======== Helpers ========
+    function setStatus(text) { el.status.textContent = text; }
+    function showToast(text, kind) {
+      el.toast.textContent = text;
+      el.toast.classList.remove("hidden");
+      el.toast.style.borderColor = kind === "danger" ? "var(--danger)" : kind === "warn" ? "var(--warn)" : "var(--border)";
+      setTimeout(() => el.toast.classList.add("hidden"), 2200);
+    }
+    function updateBadges() {
+      el.roomBadge.textContent = `room: ${state.room || "none"}`;
+      el.roleBadge.textContent = `role: ${state.isAdmin ? "admin" : "member"}`;
+    }
+    function renderPeople() {
+      el.peopleList.innerHTML = "";
+      const arr = [...state.participants.entries()].filter(([_, u]) => u.room === state.room);
+      el.userCount.textContent = String(arr.length);
+      el.kickSelect.innerHTML = `<option value="">Select user</option>`;
+      for (const [id, u] of arr) {
+        const li = document.createElement("li"); li.className = "item";
+        const left = document.createElement("div");
+        left.innerHTML = `<strong>${escapeHtml(u.name)}</strong> ${u.isAdmin ? '<span class="pill">admin</span>' : ""}`;
+        const right = document.createElement("div");
+        right.innerHTML = `<span class="muted mono">${id.slice(0,8)}</span>`;
+        li.append(left, right);
+        el.peopleList.appendChild(li);
+        if (!u.isAdmin) {
+          const opt = document.createElement("option");
+          opt.value = id; opt.textContent = `${u.name} (${id.slice(0,6)})`;
+          el.kickSelect.appendChild(opt);
+        }
+      }
+    }
+    function renderAdminState() {
+      el.roomLockedState.textContent = String(state.roomLocked);
+      el.mutedAllState.textContent = String(state.mutedAll);
+      el.chatInput.disabled = state.mutedAll || state.mutedByAdmin;
+      el.sendBtn.disabled = el.chatInput.disabled;
+      el.chatMutedNote.style.display = (state.mutedAll || state.mutedByAdmin) ? "block" : "none";
+    }
+    function addMessage({ name, text, at, from }) {
+      const wrap = document.createElement("div");
+      wrap.className = "msg" + (from === clientId ? " me" : "");
+      const when = new Date(at || Date.now()).toLocaleTimeString();
+      wrap.innerHTML = `
+        <div class="row" style="justify-content:space-between">
+          <div><strong>${escapeHtml(name)}</strong></div>
+          <div class="muted">${when}</div>
+        </div>
+        <div>${linkify(escapeHtml(text))}</div>
+      `;
+      el.chatList.appendChild(wrap);
+      el.chatList.scrollTop = el.chatList.scrollHeight;
+    }
+    function clearChat() { el.chatList.innerHTML = ""; }
+    function escapeHtml(s) {
+      return s.replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+    }
+    function linkify(s) {
+      return s.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>');
+    }
+
+    // ======== Events ========
+    function handleEvent(event, payload, fromId) {
+      switch (event) {
+        case "presence:join": {
+          state.participants.set(payload.id, { name: payload.name, isAdmin: payload.isAdmin, room: payload.room });
+          renderPeople();
+          addMessage({ name: "system", text: `${payload.name} joined`, at: Date.now(), from: fromId });
+          break;
+        }
+        case "presence:leave": {
+          const u = state.participants.get(payload.id);
+          state.participants.delete(payload.id);
+          renderPeople();
+          if (u && u.room === state.room) addMessage({ name: "system", text: `${u.name} left`, at: Date.now(), from: fromId });
+          break;
+        }
+        case "chat:message": {
+          addMessage({ name: payload.name, text: payload.text, at: payload.at, from: fromId });
+          break;
+        }
+        case "admin:announce": {
+          addMessage({ name: "announcement", text: payload.text, at: Date.now(), from: fromId });
+          showToast("Admin announcement received", "warn");
+          break;
+        }
+        case "admin:toggle-muteall": {
+          state.mutedAll = payload.value;
+          renderAdminState();
+          showToast(`Mute all is now ${state.mutedAll}`, "warn");
+          break;
+        }
+        case "admin:toggle-lockroom": {
+          state.roomLocked = payload.value;
+          renderAdminState();
+          showToast(`Room lock is now ${state.roomLocked}`, "warn");
+          break;
+        }
+        case "admin:kick": {
+          if (payload.targetId === clientId && !state.isAdmin) {
+            showToast("You were removed by an admin", "danger");
+            leaveRoom(true);
+          }
+          break;
+        }
+        case "admin:end-meeting": {
+          if (!state.isAdmin) {
+            showToast("Meeting ended by admin", "warn");
+            state.mutedByAdmin = true;
+            renderAdminState();
+          }
+          addMessage({ name: "system", text: "Meeting ended by admin", at: Date.now(), from: fromId });
+          break;
+        }
+      }
+    }
+
+    // ======== Join / Leave ========
+    function joinRoom() {
+      const room = el.roomInput.value.trim() || "general";
+      const name = el.nameInput.value.trim() || "Guest";
+      const pin = (el.pinInput.value || "").trim();
+      const wantsAdmin = pin.length > 0;
+      const isAdmin = wantsAdmin && pin === ADMIN_PIN;
+
+      if (state.roomLocked && !isAdmin) {
+        showToast("Room is locked by admin", "danger");
+        return;
+      }
+      state.room = room;
+      state.name = name;
+      state.isAdmin = isAdmin;
+      state.joined = true;
+      updateBadges();
+      setStatus(`Joined ${room} as ${name}${isAdmin ? " (admin)" : ""}`);
+      // Announce myself
+      state.participants.set(clientId, { name, isAdmin, room });
+      renderPeople();
+      post("presence:join", { id: clientId, name, isAdmin, room });
+      // UI
+      el.adminLockedNote.classList.toggle("hidden", isAdmin);
+      el.adminControls.classList.toggle("hidden", !isAdmin);
+      renderAdminState();
+    }
+
+    function leaveRoom(silent) {
+      if (state.joined) {
+        if (!silent) post("presence:leave", { id: clientId, room: state.room });
+      }
+      state.joined = false;
+      state.name = "";
+      state.room = "";
+      state.isAdmin = false;
+      state.mutedByAdmin = false;
+      updateBadges();
+      setStatus("Idle");
+      state.participants.clear();
+      renderPeople();
+      clearChat();
+      el.chatInput.value = "";
+      el.pinInput.value = "";
+      el.adminControls.classList.add("hidden");
+      el.adminLockedNote.classList.remove("hidden");
+      renderAdminState();
+    }
+
+    // Leave on tab close
+    window.addEventListener("beforeunload", () => {
+      if (state.joined) {
+        localStorage.setItem("ts-last-leave", Date.now());
+        post("presence:leave", { id: clientId, room: state.room });
+      }
+    });
+
+    // ======== Actions ========
+    el.joinBtn.addEventListener("click", joinRoom);
+    el.roomInput.addEventListener("keydown", (e) => e.key === "Enter" && joinRoom());
+    el.nameInput.addEventListener("keydown", (e) => e.key === "Enter" && joinRoom());
+    el.pinInput.addEventListener("keydown", (e) => e.key === "Enter" && joinRoom());
+
+    el.sendBtn.addEventListener("click", () => {
+      const text = el.chatInput.value.trim();
+      if (!text || !state.joined) return;
+      if (state.mutedAll || state.mutedByAdmin) { showToast("Chat is muted by admin", "danger"); return; }
+      const payload = { room: state.room, name: state.name || "Guest", text, at: Date.now() };
+      addMessage({ name: payload.name, text, at: payload.at, from: clientId });
+      post("chat:message", payload);
+      el.chatInput.value = "";
+    });
+    el.chatInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); el.sendBtn.click(); }
+    });
+
+    // ======== Admin controls ========
+    el.announceBtn.addEventListener("click", () => {
+      if (!state.isAdmin) return;
+      const text = prompt("Announcement message?");
+      if (!text) return;
+      post("admin:announce", { room: state.room, text });
+      addMessage({ name: "announcement (me)", text, at: Date.now(), from: clientId });
+    });
+
+    el.muteAllBtn.addEventListener("click", () => {
+      if (!state.isAdmin) return;
+      state.mutedAll = !state.mutedAll;
+      renderAdminState();
+      post("admin:toggle-muteall", { room: state.room, value: state.mutedAll });
+      showToast(`Mute all: ${state.mutedAll ? "on" : "off"}`);
+    });
+
+    el.lockRoomBtn.addEventListener("click", () => {
+      if (!state.isAdmin) return;
+      state.roomLocked = !state.roomLocked;
+      renderAdminState();
+      post("admin:toggle-lockroom", { room: state.room, value: state.roomLocked });
+      showToast(`Room locked: ${state.roomLocked ? "on" : "off"}`);
+    });
+
+    el.endMeetingBtn.addEventListener("click", () => {
+      if (!state.isAdmin) return;
+      post("admin:end-meeting", { room: state.room });
+      addMessage({ name: "system", text: "You ended the meeting", at: Date.now(), from: clientId });
+    });
+
+    el.kickBtn.addEventListener("click", () => {
+      if (!state.isAdmin) return;
+      const targetId = el.kickSelect.value;
+      if (!targetId) return;
+      post("admin:kick", { room: state.room, targetId });
+      showToast("Kick signal sent");
+    });
+
+    // ======== Initial UI ========
+    updateBadges();
+    renderAdminState();
+
+  </script>
+</body>
+</html>
